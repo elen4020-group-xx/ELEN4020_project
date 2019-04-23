@@ -1,5 +1,34 @@
 #include <mpi.h>
 #include <stdio.h>
+#include <math.h>
+
+
+void swap(short &s1, short &s2)
+{
+    short temp=s1;
+    s1=s2;
+    s2=temp;
+}
+
+void transposeBlock(short* mat,int dim)
+{
+    //this will still be in row major
+    for (int i = 0; i < dim; ++i )
+    {
+       for (int j = 0; j < i; ++j )
+       {
+          // Index in the original matrix.
+          int index1 = i*dim+j;
+
+          // Index in the transpose matrix.
+          int index2 = j*dim+i;
+
+         swap(mat[index1],mat[index2]);
+       }
+    }
+
+}
+
 
 int main(int argc, char** argv) {
     // Initialize the MPI environment
@@ -10,32 +39,104 @@ int main(int argc, char** argv) {
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    char buf[2];
     short chunk[2][2];
 
     // Get the rank of the process
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File_open(MPI_COMM_WORLD, "myfile",MPI_MODE_RDONLY,
+    MPI_File_open(MPI_COMM_WORLD, "mfile",MPI_MODE_RDONLY,
     MPI_INFO_NULL, &fh);
-    MPI_Offset offset;
 
-    offset=0; 
+    short myNums[2][2];
 
-   
-        MPI_File_read(fh, buf, sizeof(buf)*sizeof(char), MPI_CHAR, MPI_STATUS_IGNORE);
 
- 
-        //chunk[i][j]=buf[i*2+j]-'0';
-        printf("%x\n",buf);
-    
-      
+    short matSize;
 
-    
+
+    MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);
+   // printf(" matrix size is %d\n",matSize);
+
+    int noBlocks=world_size;
+    int matElems=matSize*matSize;
+    int blockSize=matElems/noBlocks;//buffer size
+
+    int blockDim=sqrt(blockSize);
+
+
+    printf("blocksize : %d\n",blockDim);
+
+
+//////
+    int blocksPerRow=matSize/blockDim;
+    int blockNum=rank;
+
+    int row = (blockNum/blocksPerRow)*blockDim;
+
+	int startCol = (blockNum)%blocksPerRow*blockDim;
+
+    int offset_per_mat_row=matSize*sizeof(short);
+
+    int bufLoc=0;
+
+    short* thisBuf=(short*)malloc(sizeof(short)*blockSize);
+    long int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
+
+
+///COULD BE DONE WITH NON CONTIGUOUS FILE VIEW
+    for(int i=0; i< blockDim;i++)
+    {   
+        ///+2 for the mat size
+        MPI_File_read_at_all(fh,offset+2,thisBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
+        offset+=offset_per_mat_row;
+        bufLoc+=blockDim;
+        row=row+1;
+    }
 
     MPI_File_close(&fh); 
 
+
+   transposeBlock(thisBuf,blockDim);
+
+
+   int correspondingBlock=0;
+
+   if(rank%(blockDim+1)==0)
+    {
+        correspondingBlock=rank;//loopback
+    }
+    else
+    {
+        int row=rank/blocksPerRow;
+        int col=rank%blocksPerRow;
+
+        correspondingBlock=col*blocksPerRow+row;
+
+    }
+    
+
+
+    
+    
+
+    MPI_Win window;
+
+    // MPI_Win_create(myNums,sizeof(short)*4,sizeof(short),MPI_INFO_NULL, MPI_COMM_WORLD,&window);    // do put and get calls
+    // MPI_Win_fence(MPI_MODE_NOPRECEDE, window); 
+
+    // short rcvBuf[2][2];
+
+    // MPI_Get(rcvBuf,4,MPI_SHORT,2,0,4, MPI_SHORT,window);
+
+    // MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
+    // MPI_Win_free( &window );
+
+
+
+    
+
+
     // Finalize the MPI environment.
     MPI_Finalize();
+    return 0;
 }
