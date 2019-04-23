@@ -143,7 +143,10 @@ int main(int argc, char** argv) {
 
     MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
    if(rank==0)
-     MPI_File_write(fh,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
+   {
+     MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
+     printf("dasd");
+   }
 
 
     //reset these numbers
