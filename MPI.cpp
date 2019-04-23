@@ -121,22 +121,46 @@ int main(int argc, char** argv) {
 
     MPI_Win window;
 
-    // MPI_Win_create(myNums,sizeof(short)*4,sizeof(short),MPI_INFO_NULL, MPI_COMM_WORLD,&window);    // do put and get calls
-    // MPI_Win_fence(MPI_MODE_NOPRECEDE, window); 
+    short* rcvBuf=(short*)malloc(sizeof(short)*blockSize);
 
-    // short rcvBuf[2][2];
-
-    // MPI_Get(rcvBuf,4,MPI_SHORT,2,0,4, MPI_SHORT,window);
-
-    // MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
-    // MPI_Win_free( &window );
+    MPI_Win_create(thisBuf,blockSize*sizeof(short),sizeof(short),MPI_INFO_NULL, MPI_COMM_WORLD,&window);    // do put and get calls
+    MPI_Win_fence(MPI_MODE_NOPRECEDE, window); 
 
 
+    MPI_Get(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,blockSize, MPI_SHORT,window);
 
-    
+    MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
+    MPI_Win_free( &window );
+
+    MPI_File outFile;
+
+    MPI_File_open(MPI_COMM_WORLD, "outfile",MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
+   if(rank==0)
+     MPI_File_write(fh,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
+
+
+    //reset these numbers
+        row = (blockNum/blocksPerRow)*blockDim;
+        offset=row*matSize*sizeof(short) + startCol*sizeof(short);
+        
+        bufLoc=0;
+    for(int i=0;i<blockDim;i++)
+    {
+        ///+2 for the mat size
+        MPI_File_write_at_all(outFile,offset+2,rcvBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
+        offset+=offset_per_mat_row;
+        bufLoc+=blockDim;
+        row=row+1;
+
+    }    
+
+     MPI_File_close(&outFile); 
+
 
 
     // Finalize the MPI environment.
+    free(thisBuf);
+    free(rcvBuf);
     MPI_Finalize();
     return 0;
 }
