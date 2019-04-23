@@ -10,24 +10,29 @@ int main(int argc, char** argv) {
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    char buf[100];
+    char buf[2];
+    short chunk[2][2];
 
     // Get the rank of the process
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-    MPI_File_open(MPI_COMM_WORLD, "file.txt",MPI_MODE_RDONLY,
+    MPI_File_open(MPI_COMM_WORLD, "myfile",MPI_MODE_RDONLY,
     MPI_INFO_NULL, &fh);
+    MPI_Offset offset;
 
-    if (world_rank == 0)
-    {
-        MPI_Offset x ;
-        MPI_File_get_size(fh,&x);
-        printf("ddd %lld\n",x);
-        MPI_File_read(fh, buf, 100, MPI_CHAR, MPI_STATUS_IGNORE);
-        printf("ddd %s",buf);
+    offset=0; 
 
-    }
+   
+        MPI_File_read(fh, buf, sizeof(buf)*sizeof(char), MPI_CHAR, MPI_STATUS_IGNORE);
+
+ 
+        //chunk[i][j]=buf[i*2+j]-'0';
+        printf("%x\n",buf);
+    
+      
+
+    
 
     MPI_File_close(&fh); 
 
