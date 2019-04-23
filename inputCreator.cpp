@@ -4,7 +4,7 @@
 
 int main(int argc, char* argv[])
 {
-    short N=argv[1][0]-'0';
+    short N=atoi(argv[1]);
     char* fileName=argv[2];
 
     
@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
             char buffer[2];
             inBinFile.read((char*)&buffer,sizeof(char)*sizeof(buffer));
             short num = (int)buffer[0] | (int)buffer[1]<<8;
-            printf("%d\n",num);
+          //  printf("%d\n",num);
         }
     }
     inBinFile.close();

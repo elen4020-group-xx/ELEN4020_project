@@ -5,7 +5,7 @@
 
 int main(int argc, char* argv[])
 {
-    short N=argv[1][0]-'0';
+    short N=atoi(argv[1]);
     char* fileName=argv[2];
   std::ifstream inBinFile(fileName,std::ios::in | std::ios::binary);
    char buffer[2];

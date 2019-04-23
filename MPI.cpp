@@ -31,6 +31,13 @@ void transposeBlock(short* mat,int dim)
 
 
 int main(int argc, char** argv) {
+
+
+    char* inFile=argv[1];
+    char* outFile_n=argv[2];
+
+
+
     // Initialize the MPI environment
     MPI_Init(NULL, NULL);
     MPI_File fh;
@@ -45,7 +52,7 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File_open(MPI_COMM_WORLD, "mfile",MPI_MODE_RDONLY,
+    MPI_File_open(MPI_COMM_WORLD,inFile,MPI_MODE_RDONLY,
     MPI_INFO_NULL, &fh);
 
     short myNums[2][2];
@@ -134,7 +141,7 @@ int main(int argc, char** argv) {
 
     MPI_File outFile;
 
-    MPI_File_open(MPI_COMM_WORLD, "outfile",MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
+    MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
    if(rank==0)
      MPI_File_write(fh,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
 
