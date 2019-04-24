@@ -33,3 +33,5 @@
 
 .vscode/
 *.stackdump
+berkeley_upc-2.28.0/
+upcBuild/
