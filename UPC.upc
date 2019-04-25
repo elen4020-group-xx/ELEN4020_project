@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     int blockDim=sqrt(blockSize);
 
 
-    printf("blocksize : %d\n",blockDim);
+ //   printf("blocksize : %d\n",blockDim);
 
 
 //////
@@ -117,78 +117,71 @@ int main(int argc, char** argv) {
 
     upc_barrier;
 
-    shared short* globalBuf;
-    globalBuf=upc_global_alloc(4,sizeof(short));
+    shared [] short* globalBuf;
+    globalBuf=upc_all_alloc(matElems,sizeof(short));
     
 //    ///all write to global buf
-int ll=MYTHREAD;
     upc_fence;
-    upc_memput(globalBuf+MYTHREAD,&ll, 1*sizeof(short));
-    short asd[4]={5,6,7,8};
-    upc_memput( globalBuf, asd, sizeof(short));
-
-
-    upc_fence;
-    if(MYTHREAD==0)
-        {
-            for(int j=0;j<16;j++)
-            printf("%d\n",globalBuf[j]);
-            printf("sizeof == %d",sizeof(globalBuf));
-        }
-
-    // offset=writeRow*matSize + writeCol;
-    // bufLoc=0;
-
-    //if(MYTHREAD==0)
-      //  upc_memput(globalBuf,&matSize, 1*sizeof(short));
+    
    
-    // for(int i=0; i< blockDim;i++)
-    // {   
-        
-    //     ///+1 for the mat size since sizeof already taken into account
-    //     upc_memput(globalBuf+offset,thisBuf+bufLoc, blockDim*sizeof(short));
-    //     offset+=offset_per_mat_row;
-    //     bufLoc+=blockDim;
-    // }
+
+    offset=writeRow*matSize + writeCol;
+    bufLoc=0;
+
+
+   
+    for(int i=0; i< blockDim;i++)
+    {   
+        upc_memput(globalBuf+offset,thisBuf+bufLoc, blockDim*sizeof(short));
+        offset+=matSize;
+        bufLoc+=blockDim;
+    }
     upc_fence;
     upc_barrier;
 
-    
-
-  
-
-    free(thisBuf);
-
-    
+     
+    upc_barrier;
+    if(MYTHREAD==0)
+    for (int i = 0; i < matSize; ++i )
+    {
+       for (int j = 0; j < matSize; ++j )
+       {
+          printf("%d,",globalBuf[i*matSize+j]);
+       }
+       printf("\n");
+    }
    
-
-
     
     upc_file_t* outFilePt;
-    outFilePt= upc_all_fopen(outFile, UPC_CREATE |UPC_WRONLY|UPC_INDIVIDUAL_FP, 0,0);
-    offset=row*matSize*sizeof(short) + startCol*sizeof(short);
+    outFilePt= upc_all_fopen(outFile, UPC_CREATE|UPC_WRONLY|UPC_INDIVIDUAL_FP, 0,0);
+
+
+    if(MYTHREAD==0)
+    {
+        //(upc_file_t *fd, void *buffer,size_t size, size_t nmemb, upc_flag_t flags);
+
+        upc_all_fwrite_local(outFilePt,&matSize,1,sizeof(short), UPC_IN_NOSYNC|UPC_OUT_NOSYNC);
+    }
+
+    offset=row*matSize + startCol;
 
     for(int i=0; i< blockDim;i++)
     {   
         //upc_all_fwrite_shared(upc_file_t *fd,shared void *buffer, size_t blocksize, size_t size,size_t nmemb, upc_flag_t flags);
-        if(MYTHREAD==1)
-        {
-            
-        }
-        upc_all_fseek(outFilePt,offset+2,UPC_SEEK_SET);
-        upc_all_fwrite_shared(outFilePt,globalBuf+offset+2,sizeof(short),blockDim,sizeof(short), UPC_IN_NOSYNC|UPC_OUT_NOSYNC);
-        offset+=offset_per_mat_row;
+   
+        upc_all_fseek(outFilePt,offset*sizeof(short)+2,UPC_SEEK_SET);
+        upc_all_fwrite_shared(outFilePt,globalBuf+offset,sizeof(short),blockDim,sizeof(short), 0);
+        offset+=matSize;
     }
 
-    upc_barrier;
-    upc_free(globalBuf);
     
-   upc_all_fclose (outFilePt);
+    
+   upc_barrier;
+    upc_all_fclose (outFilePt);
 
-//     barrier();
+   free(thisBuf);
 
-
-    //all read from global buf and output
+  upc_free(globalBuf);
 
 
     return 0;
