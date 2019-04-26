@@ -40,13 +40,10 @@ int main(int argc, char** argv) {
 
     // Initialize the MPI environment
     MPI_Init(NULL, NULL);
-    MPI_File fh;
-
     // Get the number of processes
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    short chunk[2][2];
 
     // Get the rank of the process
     int rank;
@@ -55,11 +52,10 @@ int main(int argc, char** argv) {
     MPI_File_open(MPI_COMM_WORLD,inFile,MPI_MODE_RDONLY,
     MPI_INFO_NULL, &fh);
 
-    short myNums[2][2];
-
 
     short matSize;
 
+    MPI_File fh;
 
     MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);
    // printf(" matrix size is %d\n",matSize);
@@ -71,7 +67,6 @@ int main(int argc, char** argv) {
     int blockDim=sqrt(blockSize);
 
 
-    printf("blocksize : %d\n",blockDim);
 
 
 //////
@@ -97,7 +92,6 @@ int main(int argc, char** argv) {
         MPI_File_read_at_all(fh,offset+2,thisBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
         offset+=offset_per_mat_row;
         bufLoc+=blockDim;
-        row=row+1;
     }
 
     MPI_File_close(&fh); 
@@ -150,7 +144,6 @@ int main(int argc, char** argv) {
 
 
     //reset these numbers
-        row = (blockNum/blocksPerRow)*blockDim;
         offset=row*matSize*sizeof(short) + startCol*sizeof(short);
         
         bufLoc=0;
@@ -160,8 +153,6 @@ int main(int argc, char** argv) {
         MPI_File_write_at_all(outFile,offset+2,rcvBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
         offset+=offset_per_mat_row;
         bufLoc+=blockDim;
-        row=row+1;
-
     }    
 
      MPI_File_close(&outFile); 

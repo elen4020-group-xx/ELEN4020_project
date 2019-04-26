@@ -88,6 +88,7 @@ int main(int argc, char** argv) {
         offset+=offset_per_mat_row;
         bufLoc+=blockDim;
     }
+    upc_barrier;
 
     upc_all_fclose (inpFilePt);
 
@@ -118,29 +119,27 @@ int main(int argc, char** argv) {
     upc_barrier;
 
     shared [] short* globalBuf;
-    globalBuf=upc_all_alloc(matElems,sizeof(short));
-    
+    globalBuf=upc_all_alloc(THREADS,blockSize*sizeof(short));
+
 //    ///all write to global buf
-    upc_fence;
+    upc_barrier;
     
    
 
     offset=writeRow*matSize + writeCol;
     bufLoc=0;
 
-
-   
     for(int i=0; i< blockDim;i++)
     {   
         upc_memput(globalBuf+offset,thisBuf+bufLoc, blockDim*sizeof(short));
         offset+=matSize;
         bufLoc+=blockDim;
+        upc_fence;
     }
-    upc_fence;
     upc_barrier;
 
-     
-    upc_barrier;
+    printf("blocksize : %d\n",blockDim);
+
     if(MYTHREAD==0)
     for (int i = 0; i < matSize; ++i )
     {
@@ -176,12 +175,14 @@ int main(int argc, char** argv) {
 
     
     
-   upc_barrier;
-    upc_all_fclose (outFilePt);
-
+   
+    while(upc_all_fclose (outFilePt)!=0)
+    {
+        printf("ye\n");
+    }
+    upc_barrier;
    free(thisBuf);
-
-  upc_free(globalBuf);
+   
 
 
     return 0;
