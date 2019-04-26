@@ -49,15 +49,16 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    MPI_File fh;
+
     MPI_File_open(MPI_COMM_WORLD,inFile,MPI_MODE_RDONLY,
     MPI_INFO_NULL, &fh);
 
 
     short matSize;
 
-    MPI_File fh;
 
-    MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);
+    MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);//let all procs read the size of the matrix
    // printf(" matrix size is %d\n",matSize);
 
     int noBlocks=world_size;
@@ -66,10 +67,6 @@ int main(int argc, char** argv) {
 
     int blockDim=sqrt(blockSize);
 
-
-
-
-//////
     int blocksPerRow=matSize/blockDim;
     int blockNum=rank;
 
@@ -77,29 +74,28 @@ int main(int argc, char** argv) {
 
 	int startCol = (blockNum)%blocksPerRow*blockDim;
 
-    int offset_per_mat_row=matSize*sizeof(short);
+    int offset_per_mat_row=matSize;
 
     int bufLoc=0;
+
+    MPI_Datatype subMatrix;
+
+    MPI_Type_vector(matSize*blockDim,blockDim,offset_per_mat_row,MPI_SHORT, &subMatrix );
+    MPI_Type_commit( &subMatrix );
+
 
     short* thisBuf=(short*)malloc(sizeof(short)*blockSize);
     long int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
 
+    MPI_File_set_view(fh, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL); 
 
-///COULD BE DONE WITH NON CONTIGUOUS FILE VIEW
-    for(int i=0; i< blockDim;i++)
-    {   
-        ///+2 for the mat size
-        MPI_File_read_at_all(fh,offset+2,thisBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
-        offset+=offset_per_mat_row;
-        bufLoc+=blockDim;
-    }
+
+    MPI_File_read_all(fh,thisBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+     
 
     MPI_File_close(&fh); 
 
-
    transposeBlock(thisBuf,blockDim);
-
-
    int correspondingBlock=0;
 
    if(rank%(blockDim+1)==0)
@@ -110,16 +106,10 @@ int main(int argc, char** argv) {
     {
         int row=rank/blocksPerRow;
         int col=rank%blocksPerRow;
-
         correspondingBlock=col*blocksPerRow+row;
-
     }
     
-
-
-    
-    
-
+//Window and one-sided
     MPI_Win window;
 
     short* rcvBuf=(short*)malloc(sizeof(short)*blockSize);
@@ -132,34 +122,28 @@ int main(int argc, char** argv) {
 
     MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
     MPI_Win_free( &window );
-
+//Comms complete
     MPI_File outFile;
 
     MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
-   if(rank==0)
-   {
-     MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
-     printf("dasd");
-   }
+
+    if(rank==0)//let rank 0 write the mat size
+    {
+        MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
+    }
 
 
     //reset these numbers
-        offset=row*matSize*sizeof(short) + startCol*sizeof(short);
-        
-        bufLoc=0;
-    for(int i=0;i<blockDim;i++)
-    {
-        ///+2 for the mat size
-        MPI_File_write_at_all(outFile,offset+2,rcvBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
-        offset+=offset_per_mat_row;
-        bufLoc+=blockDim;
-    }    
+    offset=row*matSize*sizeof(short) + startCol*sizeof(short);
+    MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
 
-     MPI_File_close(&outFile); 
+    MPI_File_write_all(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+    MPI_File_close(&outFile); 
 
 
 
     // Finalize the MPI environment.
+    MPI_Type_free( &subMatrix );
     free(thisBuf);
     free(rcvBuf);
     MPI_Finalize();
