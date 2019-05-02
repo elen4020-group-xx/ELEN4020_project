@@ -32,9 +32,9 @@ void transposeBlock(short* mat,int dim)
 
 
 int main(int argc, char** argv) {
+
     double t1, t2; 
     t1 = MPI_Wtime(); 
-
     char* inFile=argv[1];
     char* outFile_n=argv[2];
 
@@ -112,15 +112,18 @@ int main(int argc, char** argv) {
     }
     
 //Window and one-sided
+    MPI_Win window;
 
     short* rcvBuf=(short*)malloc(sizeof(short)*blockSize);
 
-  //  MPI_Send(void* data,int count,MPI_Datatype datatype,int destination,int tag,MPI_Comm communicator)
-
-    MPI_Send(thisBuf,blockSize,MPI_SHORT,correspondingBlock,0,MPI_COMM_WORLD);
-    MPI_Recv(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,MPI_COMM_WORLD,0);
+    MPI_Win_create(thisBuf,blockSize*sizeof(short),sizeof(short),MPI_INFO_NULL, MPI_COMM_WORLD,&window);    // do put and get calls
+    MPI_Win_fence(MPI_MODE_NOPRECEDE, window); 
 
 
+    MPI_Get(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,blockSize, MPI_SHORT,window);
+
+    MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
+    MPI_Win_free( &window );
 //Comms complete
     MPI_File outFile;
 
@@ -145,10 +148,10 @@ int main(int argc, char** argv) {
     MPI_Type_free( &subMatrix );
     free(thisBuf);
     free(rcvBuf);
+
     t2 = MPI_Wtime(); 
     if(rank==0)
     printf( "Elapsed time is %f\n", t2 - t1 ); 
-
     MPI_Finalize();
     return 0;
 }
