@@ -36,13 +36,13 @@ void transposeBlock(short* mat,int dim)
 
 int main(int argc, char** argv) {
 
-    srand(time(NULL));
 
     double t1, t2; 
     t1 = MPI_Wtime(); 
     int matSize=atoi(argv[1]);
     char* outFile_n=argv[2];
-
+    printf("xd");
+   
 
 
     // Initialize the MPI environment
@@ -56,13 +56,14 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-
+    srand(time(NULL)+rank);
     int matElems=matSize*matSize;
+
 
 
     int noBlocks=world_size;
 
-    if((matElems/world_size<4))
+    if( (matElems/world_size) < 4)
         noBlocks=matElems/4; //limit number of processes
 
 
@@ -88,19 +89,23 @@ int main(int argc, char** argv) {
     }
 
    transposeBlock(thisBuf,blockDim);
-   int correspondingBlock=0;
 
-   if(rank%(blockDim+1)==0)
+
+    for (int i=0; i<blockDim;i++)
     {
-        correspondingBlock=rank;//loopback
-    }
-    else
-    {
-        int row=rank/blocksPerRow;
-        int col=rank%blocksPerRow;
-        correspondingBlock=col*blocksPerRow+row;
+        printf("rank %d row  %d ",rank,i);
+        for(int j=0;j<blockDim;j++)
+        {
+
+            printf("%d,",thisBuf[j+i*blockDim]);
+
+        }
+        printf("\n");
     }
     
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+
 //Window and one-sided
     MPI_Win window;
 
@@ -114,52 +119,68 @@ int main(int argc, char** argv) {
         rcvBuf=(short*)malloc(sizeof(short)*blockSize*blockSize);
         for(int i=0;i<noBlocks;i++)
         {
-            MPI_Get(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,correspondingBlock,0,blockSize, MPI_SHORT,window);
+            MPI_Get(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,blockSize, MPI_SHORT,window);
         }
     }
-
     MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
+
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Win_free( &window );
+            printf("ds");
 
 
+    MPI_File outFile;
 
+
+    MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
 
 //rank0 write to file
+    MPI_Datatype subMatrix;
+
+    MPI_Type_vector(matSize*blockDim,blockDim,matSize,MPI_SHORT, &subMatrix );//derived data type
+    MPI_Type_commit( &subMatrix );
 
     if(rank==0)
     {
-        MPI_File outFile;
-
-        MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
-
-
         MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
-        MPI_Datatype subMatrix;
-
-        MPI_Type_vector(matSize*blockDim,blockDim,matSize,MPI_SHORT, &subMatrix );//derived data type
-        MPI_Type_commit( &subMatrix );
-
-        for (int i=0;i<noBlocks;i++)
-        {
-            int row = (i/blocksPerRow)*blockDim;
-
-            int startCol = (i)%blocksPerRow*blockDim;
-
-            int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
-            MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
-
-            MPI_File_write(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
-        }
-        MPI_File_close(&outFile); 
-        MPI_Type_free( &subMatrix );
-
     }
+
+    for (int i=0;i<noBlocks;i++)
+    {
+        
+
+        int row,col=0;
+        if(i%(blockDim+1)==0)
+        {//loopback
+             row = (i/blocksPerRow)*blockDim;
+             col = (i)%blocksPerRow*blockDim;
+        }
+        else
+        {
+             col=i/blocksPerRow;
+             row=i%blocksPerRow;
+
+        }
+
+        int offset=row*matSize*sizeof(short)*blockDim + col*sizeof(short)*blockDim;
+        //printf("I %d off %d \n",i,offset);
+        MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
+        if(rank==0)
+            MPI_File_write(outFile,rcvBuf+(i*blockSize), blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+    }
+
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Type_free( &subMatrix );
+
+
+    MPI_File_close(&outFile); 
 
 
 
     // Finalize the MPI environment.
     free(thisBuf);
-    free(rcvBuf);
+    // free(rcvBuf);
 
     t2 = MPI_Wtime(); 
     if(rank==0)

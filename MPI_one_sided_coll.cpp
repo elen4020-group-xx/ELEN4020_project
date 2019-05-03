@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
    transposeBlock(thisBuf,blockDim);
    int correspondingBlock=0;
 
-   if(rank%(blockDim+1)==0)
+   if(rank%(blocksPerRow+1)==0)
     {
         correspondingBlock=rank;//loopback
     }

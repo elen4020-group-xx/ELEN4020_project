@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     double t1, t2; 
     t1 = MPI_Wtime(); 
 
-    srand(time(NULL));
+   // srand(time(NULL));
 
 
     int matSize=atoi(argv[1]);
@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-
+    srand(time(NULL)+rank);
 
 
 
@@ -89,66 +89,86 @@ int main(int argc, char** argv) {
     {
         thisBuf[i]=rand()%100;
     }
-
+    
 
    transposeBlock(thisBuf,blockDim);
-   int correspondingBlock=0;
+   
 
-   if(rank%(blockDim+1)==0)
-    {
-        correspondingBlock=rank;//loopback
-    }
-    else
-    {
-        int row=rank/blocksPerRow;
-        int col=rank%blocksPerRow;
-        correspondingBlock=col*blocksPerRow+row;
-    }
     
-//Window and one-sided
+ for (int i=0; i<blockDim;i++)
+    {
+        printf("rank% d row  %d ",rank,i);
+        for(int j=0;j<blockDim;j++)
+        {
+
+            printf("%d,",thisBuf[j+i*blockDim]);
+
+        }
+        printf("\n");
+    }
+
+//send and recv
 
     short* rcvBuf=NULL;
 
     if(rank<noBlocks)
-    MPI_Send(thisBuf,blockSize,MPI_SHORT,correspondingBlock,0,MPI_COMM_WORLD);
+    MPI_Send(thisBuf,blockSize,MPI_SHORT,0,0,MPI_COMM_WORLD);
 
     if(rank==0)
     {
-        rcvBuf=(short*)malloc(sizeof(short)*blockSize);
+        rcvBuf=(short*)malloc(sizeof(short)*blockSize*blockSize);
         for(int i=0;i<noBlocks;i++)
         {
+                    printf("d");
             MPI_Recv(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,MPI_COMM_WORLD,0);
         }
     }
 
+
+ 
+
 //Comms complete
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    MPI_File outFile;
+
+    MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
 
 
     if(rank==0)//let rank 0 write the mat size
     {
-        MPI_File outFile;
-
-        MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
-        MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
+        printf("d");
 
         int bufLoc=0;
+        MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
 
         for (int i=0;i<noBlocks;i++)
         {
-            int row = (i/blocksPerRow)*blockDim;
-
-            int startCol = (i)%blocksPerRow*blockDim;
-
-            int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
-            for(int j=0;i<blockDim;j++)
+            int row,col=0;
+            if(i%(blocksPerRow+1)==0)
+            {//loopback
+                row = (i/blocksPerRow);
+                col = (i)%blocksPerRow;
+            }
+            else
             {
-                MPI_File_write_at(outFile,offset+2,rcvBuf+bufLoc, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
-                offset+=matSize;
+                col=i/blocksPerRow;
+                row=i%blocksPerRow;
+            }
+            int offset=row*matSize*sizeof(short)*blockDim + col*sizeof(short)*blockDim;
+            for(int j=0;j<blockDim;j++)
+            {
+         
+                MPI_File_write_at(outFile,offset+2,rcvBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
+                printf("I %d off %d \n",i,offset);
+                offset+=matSize*sizeof(short);
                 bufLoc+=blockDim;
             }
         }
-        MPI_File_close(&outFile); 
     }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_File_close(&outFile); 
 
     // Finalize the MPI environment.
     free(thisBuf);
