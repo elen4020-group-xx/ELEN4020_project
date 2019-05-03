@@ -41,7 +41,6 @@ int main(int argc, char** argv) {
     t1 = MPI_Wtime(); 
     int matSize=atoi(argv[1]);
     char* outFile_n=argv[2];
-    printf("xd");
    
 
 
@@ -80,30 +79,17 @@ int main(int argc, char** argv) {
 	int startCol = (blockNum)%blocksPerRow*blockDim;
 
 
-    short* thisBuf=(short*)malloc(sizeof(short)*blockSize);
-    // long int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
-
-    for(int i=0;i<blockSize; i++)//random init
-    {
-        thisBuf[i]=rand()%100;
-    }
-
-   transposeBlock(thisBuf,blockDim);
-
-
-    for (int i=0; i<blockDim;i++)
-    {
-        printf("rank %d row  %d ",rank,i);
-        for(int j=0;j<blockDim;j++)
+   short* thisBuf=NULL;
+    
+    if(rank<noBlocks){
+        thisBuf=(short*)malloc(sizeof(short)*blockSize);
+        for(int i=0;i<blockSize; i++)//random init
         {
-
-            printf("%d,",thisBuf[j+i*blockDim]);
-
+            thisBuf[i]=rand()%100;
         }
-        printf("\n");
+        transposeBlock(thisBuf,blockDim);
+
     }
-    
-    
     MPI_Barrier(MPI_COMM_WORLD);
 
 //Window and one-sided
@@ -116,7 +102,7 @@ int main(int argc, char** argv) {
     short* rcvBuf=NULL;
     if(rank==0)
     {
-        rcvBuf=(short*)malloc(sizeof(short)*blockSize*blockSize);
+        rcvBuf=(short*)malloc(sizeof(short)*matElems);
         for(int i=0;i<noBlocks;i++)
         {
             MPI_Get(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,blockSize, MPI_SHORT,window);
@@ -126,7 +112,6 @@ int main(int argc, char** argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Win_free( &window );
-            printf("ds");
 
 
     MPI_File outFile;
@@ -178,9 +163,8 @@ int main(int argc, char** argv) {
 
 
 
-    // Finalize the MPI environment.
     free(thisBuf);
-    // free(rcvBuf);
+    free(rcvBuf);
 
     t2 = MPI_Wtime(); 
     if(rank==0)

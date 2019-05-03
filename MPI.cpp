@@ -67,7 +67,6 @@ int main(int argc, char** argv) {
     if((matElems/world_size)<4)
         noBlocks=matElems/4; //limit number of processes
 
-
     int blockSize=matElems/noBlocks;//buffer size
 
     int blockDim=sqrt(blockSize);
@@ -84,28 +83,18 @@ int main(int argc, char** argv) {
     int bufLoc=0;
 
 
-    short* thisBuf=(short*)malloc(sizeof(short)*blockSize);
-    for(int i=0;i<blockSize; i++)//random init
-    {
-        thisBuf[i]=rand()%100;
-    }
+    short* thisBuf=NULL;
     
-
-   transposeBlock(thisBuf,blockDim);
-   
-
-    
- for (int i=0; i<blockDim;i++)
-    {
-        printf("rank% d row  %d ",rank,i);
-        for(int j=0;j<blockDim;j++)
+    if(rank<noBlocks){
+        thisBuf=(short*)malloc(sizeof(short)*blockSize);
+        for(int i=0;i<blockSize; i++)//random init
         {
-
-            printf("%d,",thisBuf[j+i*blockDim]);
-
+            thisBuf[i]=rand()%100;
         }
-        printf("\n");
+        transposeBlock(thisBuf,blockDim);
+
     }
+
 
 //send and recv
 
@@ -116,14 +105,12 @@ int main(int argc, char** argv) {
 
     if(rank==0)
     {
-        rcvBuf=(short*)malloc(sizeof(short)*blockSize*blockSize);
+        rcvBuf=(short*)malloc(sizeof(short)*matElems);
         for(int i=0;i<noBlocks;i++)
         {
-                    printf("d");
             MPI_Recv(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,MPI_COMM_WORLD,0);
         }
     }
-
 
  
 
@@ -137,8 +124,6 @@ int main(int argc, char** argv) {
 
     if(rank==0)//let rank 0 write the mat size
     {
-        printf("d");
-
         int bufLoc=0;
         MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
 
@@ -160,7 +145,6 @@ int main(int argc, char** argv) {
             {
          
                 MPI_File_write_at(outFile,offset+2,rcvBuf+bufLoc, blockDim, MPI_SHORT, MPI_STATUS_IGNORE);
-                printf("I %d off %d \n",i,offset);
                 offset+=matSize*sizeof(short);
                 bufLoc+=blockDim;
             }
