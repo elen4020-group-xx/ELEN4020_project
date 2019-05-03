@@ -1,8 +1,6 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <math.h>
-#include <stdlib.h>     
-#include <time.h>       
 
 
 void swap(short &s1, short &s2)
@@ -34,15 +32,11 @@ void transposeBlock(short* mat,int dim)
 
 
 int main(int argc, char** argv) {
+
     double t1, t2; 
     t1 = MPI_Wtime(); 
-
-    srand(time(NULL));
-
-
-    int matSize=atoi(argv[1]);
+    char* inFile=argv[1];
     char* outFile_n=argv[2];
-
 
 
 
@@ -57,17 +51,20 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    MPI_File fh;
+
+    MPI_File_open(MPI_COMM_WORLD,inFile,MPI_MODE_RDONLY,
+    MPI_INFO_NULL, &fh);
 
 
+    short matSize;
 
+
+    MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);//let all procs read the size of the matrix
+   // printf(" matrix size is %d\n",matSize);
 
     int noBlocks=world_size;
     int matElems=matSize*matSize;
-
-    if((matElems/world_size)<4)
-        noBlocks=matElems/4; //limit number of processes
-
-
     int blockSize=matElems/noBlocks;//buffer size
 
     int blockDim=sqrt(blockSize);
@@ -83,13 +80,22 @@ int main(int argc, char** argv) {
 
     int bufLoc=0;
 
+    MPI_Datatype subMatrix;
+
+    MPI_Type_vector(matSize*blockDim,blockDim,offset_per_mat_row,MPI_SHORT, &subMatrix );
+    MPI_Type_commit( &subMatrix );
+
 
     short* thisBuf=(short*)malloc(sizeof(short)*blockSize);
-    for(int i=0;i<blockSize; i++)//random init
-    {
-        thisBuf[i]=rand()%100;
-    }
+    long int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
 
+    MPI_File_set_view(fh, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL); 
+
+
+    MPI_File_read_all(fh,thisBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+     
+
+    MPI_File_close(&fh); 
 
    transposeBlock(thisBuf,blockDim);
    int correspondingBlock=0;
@@ -106,57 +112,46 @@ int main(int argc, char** argv) {
     }
     
 //Window and one-sided
+    MPI_Win window;
 
-    short* rcvBuf=NULL;
+    short* rcvBuf=(short*)malloc(sizeof(short)*blockSize);
 
-    if(rank<noBlocks)
-    MPI_Send(thisBuf,blockSize,MPI_SHORT,correspondingBlock,0,MPI_COMM_WORLD);
+    MPI_Win_create(thisBuf,blockSize*sizeof(short),sizeof(short),MPI_INFO_NULL, MPI_COMM_WORLD,&window);    // do put and get calls
+    MPI_Win_fence(MPI_MODE_NOPRECEDE, window); 
 
-    if(rank==0)
-    {
-        rcvBuf=(short*)malloc(sizeof(short)*blockSize);
-        for(int i=0;i<noBlocks;i++)
-        {
-            MPI_Recv(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,MPI_COMM_WORLD,0);
-        }
-    }
 
+    MPI_Get(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,blockSize, MPI_SHORT,window);
+
+    MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
+    MPI_Win_free( &window );
 //Comms complete
+    MPI_File outFile;
 
+    MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
 
     if(rank==0)//let rank 0 write the mat size
     {
-        MPI_File outFile;
-
-        MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
         MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
-
-        int bufLoc=0;
-
-        for (int i=0;i<noBlocks;i++)
-        {
-            int row = (i/blocksPerRow)*blockDim;
-
-            int startCol = (i)%blocksPerRow*blockDim;
-
-            int offset=row*matSize*sizeof(short) + startCol*sizeof(short);
-            for(int j=0;i<blockDim;j++)
-            {
-                MPI_File_write_at(outFile,offset+2,rcvBuf+bufLoc, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
-                offset+=matSize;
-                bufLoc+=blockDim;
-            }
-        }
-        MPI_File_close(&outFile); 
     }
 
+
+    //reset these numbers
+    offset=row*matSize*sizeof(short) + startCol*sizeof(short);
+    MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
+
+    MPI_File_write_all(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+    MPI_File_close(&outFile); 
+
+
+
     // Finalize the MPI environment.
+    MPI_Type_free( &subMatrix );
     free(thisBuf);
     free(rcvBuf);
+
     t2 = MPI_Wtime(); 
     if(rank==0)
     printf( "Elapsed time is %f\n", t2 - t1 ); 
-
     MPI_Finalize();
     return 0;
 }
