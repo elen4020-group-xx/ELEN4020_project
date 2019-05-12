@@ -61,8 +61,8 @@ int main(int argc, char** argv) {
 
 
     MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);//let all procs read the size of the matrix
-   // printf(" matrix size is %d\n",matSize);
 
+    //coordinate transformation variables
     int noBlocks=world_size;
     int matElems=matSize*matSize;
     int blockSize=matElems/noBlocks;//buffer size
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
 
     MPI_Datatype subMatrix;
 
-    MPI_Type_vector(matSize*blockDim,blockDim,offset_per_mat_row,MPI_SHORT, &subMatrix );
+    MPI_Type_vector(matSize*blockDim,blockDim,offset_per_mat_row,MPI_SHORT, &subMatrix );//derived data type for file writing/reading
     MPI_Type_commit( &subMatrix );
 
 
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
     MPI_File_set_view(fh, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL); 
 
 
-    MPI_File_read_all(fh,thisBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+    MPI_File_read_all(fh,thisBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);//each proc reads only once
      
 
     MPI_File_close(&fh); 
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
    transposeBlock(thisBuf,blockDim);
    int correspondingBlock=0;
 
-   if(rank%(blocksPerRow+1)==0)
+   if(rank%(blocksPerRow+1)==0)// find partner block
     {
         correspondingBlock=rank;//loopback
     }
@@ -111,12 +111,9 @@ int main(int argc, char** argv) {
         correspondingBlock=col*blocksPerRow+row;
     }
     
-//Window and one-sided
+//Send and Recv to corresponding block
 
     short* rcvBuf=(short*)malloc(sizeof(short)*blockSize);
-
-  //  MPI_Send(void* data,int count,MPI_Datatype datatype,int destination,int tag,MPI_Comm communicator)
-
     MPI_Send(thisBuf,blockSize,MPI_SHORT,correspondingBlock,0,MPI_COMM_WORLD);
     MPI_Recv(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,MPI_COMM_WORLD,0);
 
@@ -126,7 +123,7 @@ int main(int argc, char** argv) {
 
     MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
 
-    if(rank==0)//let rank 0 write the mat size
+    if(rank==0)//let rank 0 write the mat size to the file
     {
         MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
     }
@@ -136,7 +133,7 @@ int main(int argc, char** argv) {
     offset=row*matSize*sizeof(short) + startCol*sizeof(short);
     MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
 
-    MPI_File_write_all(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+    MPI_File_write_all(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);// all proces write only once
     MPI_File_close(&outFile); 
 
 

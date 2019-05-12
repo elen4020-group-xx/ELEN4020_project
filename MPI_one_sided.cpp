@@ -68,12 +68,14 @@ int main(int argc, char** argv) {
 
 
     int blockSize=matElems/noBlocks;//buffer size
-    while(!(sqrt(blockSize)-floor(sqrt(blockSize)) )==0){
+    while(!(sqrt(blockSize)-floor(sqrt(blockSize)) )==0){//ensure square submatrix
         noBlocks--;
-        if(matElems%noBlocks==0){
+        if(matElems%noBlocks==0){//make sure still divisible
             blockSize=matElems/noBlocks;
         }
     }
+
+    //coordinate mapping variables
     int blockDim=sqrt(blockSize);
 
     int blocksPerRow=matSize/blockDim;
@@ -88,7 +90,7 @@ int main(int argc, char** argv) {
     
     if(rank<noBlocks){
         thisBuf=(short*)malloc(sizeof(short)*blockSize);
-        for(int i=0;i<blockSize; i++)//random init
+        for(int i=0;i<blockSize; i++)//random submatrix init
         {
             thisBuf[i]=rand()%100;
         }
@@ -110,7 +112,7 @@ int main(int argc, char** argv) {
         rcvBuf=(short*)malloc(sizeof(short)*matElems);
         for(int i=0;i<noBlocks;i++)
         {
-            MPI_Get(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,blockSize, MPI_SHORT,window);
+            MPI_Get(rcvBuf+(i*blockSize),blockSize,MPI_SHORT,i,0,blockSize, MPI_SHORT,window);//read each submatrix row-by-row from each window
         }
     }
     MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
@@ -118,57 +120,53 @@ int main(int argc, char** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Win_free( &window );
 
+//comms complete
 
-    MPI_File outFile;
-
-
-    MPI_File_open(MPI_COMM_WORLD, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
+  
 
 //rank0 write to file
     MPI_Datatype subMatrix;
 
-    MPI_Type_vector(matSize*blockDim,blockDim,matSize,MPI_SHORT, &subMatrix );//derived data type
+    MPI_Type_vector(matSize*blockDim,blockDim,matSize,MPI_SHORT, &subMatrix );//derived data type for file writing
     MPI_Type_commit( &subMatrix );
 
     if(rank==0)
     {
+        MPI_File outFile;
+        MPI_File_open(MPI_COMM_SELF, outFile_n,MPI_MODE_CREATE | MPI_MODE_WRONLY,MPI_INFO_NULL, &outFile);
         MPI_File_write_at(outFile,0,&matSize,1,MPI_SHORT, MPI_STATUS_IGNORE);
-    }
-
-    for (int i=0;i<noBlocks;i++)
-    {
-        
-
-        int row,col=0;
-        if(i%(blockDim+1)==0)
-        {//loopback
-             row = (i/blocksPerRow)*blockDim;
-             col = (i)%blocksPerRow*blockDim;
-        }
-        else
-        {
-             col=i/blocksPerRow;
-             row=i%blocksPerRow;
-
-        }
-
-        int offset=row*matSize*sizeof(short)*blockDim + col*sizeof(short)*blockDim;
-        //printf("I %d off %d \n",i,offset);
-        MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
-        if(rank==0)
-            MPI_File_write(outFile,rcvBuf+(i*blockSize), blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
-    }
-
     
+
+        for (int i=0;i<noBlocks;i++)
+        {
+            
+
+            int row,col=0;
+            if(i%(blockDim+1)==0)//determine corresponding block for current one
+            {//loopback
+                row = (i/blocksPerRow)*blockDim;
+                col = (i)%blocksPerRow*blockDim;
+            }
+            else
+            {
+                col=i/blocksPerRow;
+                row=i%blocksPerRow;
+
+            }
+
+            int offset=row*matSize*sizeof(short)*blockDim + col*sizeof(short)*blockDim; //determine offset 
+            MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size short
+            MPI_File_write(outFile,rcvBuf+(i*blockSize), blockSize, MPI_SHORT, MPI_STATUS_IGNORE);//write entire submatrix in one line
+        }
+
+        MPI_File_close(&outFile); //close on r0
+
+    }
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Type_free( &subMatrix );
 
 
-    MPI_File_close(&outFile); 
-
-
-
-    free(thisBuf);
+    free(thisBuf);//freeing null is safe
     free(rcvBuf);
 
     t2 = MPI_Wtime(); 

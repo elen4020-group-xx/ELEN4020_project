@@ -61,8 +61,8 @@ int main(int argc, char** argv) {
 
 
     MPI_File_read_all(fh,&matSize,1, MPI_SHORT, MPI_STATUS_IGNORE);//let all procs read the size of the matrix
-   // printf(" matrix size is %d\n",matSize);
 
+    //coordinate transformation variables
     int noBlocks=world_size;
     int matElems=matSize*matSize;
     int blockSize=matElems/noBlocks;//buffer size
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
 
     MPI_Datatype subMatrix;
 
-    MPI_Type_vector(matSize*blockDim,blockDim,offset_per_mat_row,MPI_SHORT, &subMatrix );
+    MPI_Type_vector(matSize*blockDim,blockDim,offset_per_mat_row,MPI_SHORT, &subMatrix );//derived data type for file writing/reading
     MPI_Type_commit( &subMatrix );
 
 
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
     MPI_File_set_view(fh, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL); 
 
 
-    MPI_File_read_all(fh,thisBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
+    MPI_File_read_all(fh,thisBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);//each proc reads only once
      
 
     MPI_File_close(&fh); 
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
    transposeBlock(thisBuf,blockDim);
    int correspondingBlock=0;
 
-   if(rank%(blocksPerRow+1)==0)
+   if(rank%(blocksPerRow+1)==0)//determine partner block
     {
         correspondingBlock=rank;//loopback
     }
@@ -119,8 +119,8 @@ int main(int argc, char** argv) {
     MPI_Win_create(thisBuf,blockSize*sizeof(short),sizeof(short),MPI_INFO_NULL, MPI_COMM_WORLD,&window);    // do put and get calls
     MPI_Win_fence(MPI_MODE_NOPRECEDE, window); 
 
-
-    MPI_Get(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,blockSize, MPI_SHORT,window);
+    //fetch data from partner block
+    MPI_Get(rcvBuf,blockSize,MPI_SHORT,correspondingBlock,0,blockSize, MPI_SHORT,window);//recv vector into contig buffer
 
     MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), window); 
     MPI_Win_free( &window );
@@ -139,8 +139,8 @@ int main(int argc, char** argv) {
     offset=row*matSize*sizeof(short) + startCol*sizeof(short);
     MPI_File_set_view(outFile, offset+2, MPI_SHORT, subMatrix, "native",MPI_INFO_NULL);     ///+2 for the mat size
 
-    MPI_File_write_all(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);
-    MPI_File_close(&outFile); 
+    MPI_File_write_all(outFile,rcvBuf, blockSize, MPI_SHORT, MPI_STATUS_IGNORE);//all procs only write once
+    MPI_File_close(&outFile);                                                   //write from contig buffer as vector view
 
 
 
