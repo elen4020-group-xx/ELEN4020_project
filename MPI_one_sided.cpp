@@ -68,7 +68,12 @@ int main(int argc, char** argv) {
 
 
     int blockSize=matElems/noBlocks;//buffer size
-
+    while(!(sqrt(blockSize)-floor(sqrt(blockSize)) )==0){
+        noBlocks--;
+        if(matElems%noBlocks==0){
+            blockSize=matElems/noBlocks;
+        }
+    }
     int blockDim=sqrt(blockSize);
 
     int blocksPerRow=matSize/blockDim;
