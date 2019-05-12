@@ -142,10 +142,10 @@ int main(int argc, char** argv) {
             
 
             int row,col=0;
-            if(i%(blockDim+1)==0)//determine corresponding block for current one
+            if(i%(blocksPerRow+1)==0)//determine corresponding block for current one
             {//loopback
-                row = (i/blocksPerRow)*blockDim;
-                col = (i)%blocksPerRow*blockDim;
+                row = (i/blocksPerRow);
+                col = (i)%blocksPerRow;
             }
             else
             {

@@ -6,15 +6,15 @@ mpiCC MPI_one_sided.cpp -o m1.o
 echo "Using Typical Approach"
 
 echo "16 8"
-mpiexec -n 16 --hostfile hostfile m.o 8 matrixFile_8_16_m 
+mpiexec -n 16 m.o 8 matrixFile_8_16_m 
 echo "16 16"
-mpiexec -n 16 --hostfile hostfile m.o 16 matrixFile_16_16_m 
+mpiexec -n 16 m.o 16 matrixFile_16_16_m 
 echo "16 32"
-mpiexec -n 16 --hostfile hostfile m.o 32 matrixFile_32_16_m 
+mpiexec -n 16 m.o 32 matrixFile_32_16_m 
 echo "16 64"
-mpiexec -n 16 --hostfile hostfile m.o 64 matrixFile_64_16_m 
+mpiexec -n 16 m.o 64 matrixFile_64_16_m 
 echo "16 128"
-mpiexec -n 16 --hostfile hostfile m.o 128 matrixFile_128_16_m 
+mpiexec -n 16 m.o 128 matrixFile_128_16_m 
 
 echo "32 8"
 mpiexec -n 32 m.o 8 matrixFile_8_32_m

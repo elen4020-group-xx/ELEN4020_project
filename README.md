@@ -34,7 +34,8 @@ Thus, after compiling with `mpiCC`, the two main executables can be run using:
 
 #### Alternatively, the performance results can be obtained by running the included bash scripts.
 
-These scripts print the results for all combinations of matrix size and processs count, also comparing the use of OpenMP to a serial approach.
+ These scripts print the results for all combinations of matrix size and processs count. If you wish to set openmp enabled/disabled, you can do so in the first few lines of these scripts.
+
 
 `./runTests.sh` will print the results for the two main (non collective I/O) approaches.
 
