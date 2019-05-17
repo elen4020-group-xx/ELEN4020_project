@@ -98,7 +98,7 @@ commentstyle=\color{mygreen},
 % in the abstract or keywords.
 
 \begin{abstract}
-This report presents a performance comparison of MPI's two-sided and one-sided approaches to inter-process communication. This performance comparison is made with reference to implementations of a parallel block-based matrix transposition algorithm which scales with the number of processes used. Results from the testing conducted suggest that the two-sided approach offers superior performance for sufficiently large matrices. In addition, it is found that the use of a collective I/O based scheme is a viable alternative to the two main strategies presented within this report, regardless of the communication method used.
+This report presents a performance comparison of MPI's one-sided and two-sided approaches to inter-process communication. This performance comparison is made with reference to implementations of a parallel block-based matrix transposition algorithm which scales with the number of processes used. Results from the testing conducted suggest that the two-sided approach offers superior performance for sufficiently large matrices. In addition, it is found that the use of a collective I/O based scheme is a viable alternative to the two main strategies presented within this report, regardless of the communication method used.
 
 \end{abstract}
 
@@ -107,7 +107,7 @@ This report presents a performance comparison of MPI's two-sided and one-sided a
 \section{Introduction}
 Message Passing Interface (MPI) is a message passing standard which is designed to function on a diverse range of parallel computing architectures \cite{MPIAMess20:online}. Message passing typically achieves parallelism through messages passed between processes in order to transfer data. Popular implementations of the MPI standard for message passing include OpenMPI and MPICH \cite{ompi,mpich}.
 
-MPI typically facilitates the use of the `single-program-multiple-data' (SPMD) parallelism model; as all nodes essentially run the same program. However, this is not required as many MPI implementations allow for multiple executables to exist within one MPI job. 
+MPI typically facilitates the use of the `single-program-multiple-data' (SPMD) parallelism model, as all nodes essentially run the same program. However, this is not required as many MPI implementations allow for multiple executables to exist within one MPI job. 
 
 This report presents a performance comparison of two MPI-based implementations of block-based matrix transposition \cite{transp}, parallelised amongst many processes. These implementations differ in the type of communication used: the first makes use of MPI's typical two-sided communication, using \textit{Send} and \textit{Recv}. The second implementation uses MPI's one-sided communication \cite{one}, making use of \textit{Windows} and \textit{Get}.
 
@@ -115,16 +115,16 @@ This report presents a performance comparison of two MPI-based implementations o
 
 MPI's communication model is typically point-to-point in nature. That is, inter-process communication wherein both the receiver and sender are specified. That said, MPI also allows for \textit{broadcast} and \textit{receive-from-any} communication. MPI communication is typically two-sided i.e. it consists of distinct send and receive stages. For every send there must be an associated receive (if data is to actually reach its destination). Depending on the MPI implementation, a process may need its sent message to be acknowledged by a receiver, through a \textit{Recv} call, before it can continue with the rest of its processing.
 
-In addition, MPI does allow for one-sided communication, which was included in the MPI-2 standard \cite{one,one1}. One-sided communication removes the necessity for the acknowledgement that exists within the conventional two-sided approach. Essentially, one-sided communication consists of making a \textit{Window} of a process' address space accessible to other processes; with the host process facilitating the opening and closing of the \textit{Window}. Other processes can then write or read from the \textit{Window}, as long as it remains open. This removes the need for the host process to wait for acknowledgements from those processes which require data that it holds.
+In addition, MPI allows for one-sided communication, which was included in the MPI-2 standard \cite{one,one1}. One-sided communication removes the necessity for the acknowledgement that exists within the conventional two-sided approach. Essentially, one-sided communication consists of making a \textit{Window} of a process' address space accessible to other processes; with the host process facilitating the opening and closing of the \textit{Window}. Other processes can then write or read from the \textit{Window}, as long as it remains open. This removes the need for the host process to wait for acknowledgements from those processes which require data that it holds.
 
 
 \subsection{Problem Description and Success Criteria}
 
-The brief problem statement included in the introduction must be expanded so as to fully describe the nature of this research. The matrix transposition implementation is intended to work on large data sets; which are to be stored, out-of-core, in external files. Note: matrices are stored in row major order within binary files for all implementations; individual matrix items are of the \textit{short} datatype.
+The brief problem statement included in the introduction must be expanded so as to fully describe the nature of this research. The matrix transposition implementation is intended to work on large data sets; which are to be stored, out-of-core, in external files. Note: matrices are stored in row major order within binary files for all implementations; individual matrix items are of the \textit{short} data type.
 
-The transposition implementations must be parallelised using the two MPI approaches mentioned earlier i.e. both one-sided and two-sided communication.
+The transposition implementations must be parallelised using the two MPI approaches mentioned earlier, i.e. both one-sided and two-sided communication.
 
-As described in the introduction, the algorithms discussed in this report pertain specifically to `block-based' transposition algorithms. This essentially entails splitting a large matrix into equally sized submatrices, transposing these submatrices, and performing the appropriate submatrix swaps.
+As described in the introduction, the algorithms discussed in this report pertain specifically to `block-based' matrix transposition algorithms. This essentially entails splitting a large matrix into equally sized submatrices, transposing these submatrices, and then performing the appropriate submatrix swaps.
 
 Assuming there is a $N\times N$ matrix $A$ which can be written in terms of its $K \times K$ submatrices:
 
@@ -148,7 +148,7 @@ it can be proved that:
 
 
 
-This can be generalised to any square matrix which can be split into submatrices of equal size. However, this research focuses on square matrices of dimension $2^x$ by $2^x$, where $x$ is an integer satisfying $x\geq 3$. The block-based approach is limited to a minimum submatrix dimension of $2\times 2$, as there is no smaller meaningful block size. That said, it is likely that splitting input matrices into such small submatrices will involve larger communication overhead; leading to lower performance. However, this is more formally discussed later in this report.
+This can be generalised to any square matrix which can be split into submatrices of equal size. However, this research focuses on square matrices of dimension $2^x$ by $2^x$, where $x$ is an integer satisfying $x\geq 3$. The block-based approach is limited to a minimum submatrix dimension of $2\times 2$, as there is no smaller meaningful block size. That said, it is likely that splitting input matrices into such small submatrices will involve larger communication overhead, leading to lower performance. However, this is more formally discussed later in this report.
 
 
 
@@ -157,14 +157,14 @@ This can be generalised to any square matrix which can be split into submatrices
 
 This implementation of the block-based transposition can be discussed in 4 stages: 1) Generation of matrix data, 2) Performing per-process transpositions, 3) Transmission of data to the master node, and 4) Writing of results to a file by the master node. Essentially, each process generates its own submatrix, transposes it, and passes the transposed matrix to the master process, which subsequently writes the entire transposed matrix to a file.
 
-%Note that the differences between the one-sided and two-sided communication approaches only manifests within the thrid stage of the implementation.
+%Note that the differences between the one-sided and two-sided communication approaches only manifests within the third stage of the implementation.
 
 
 \subsection{Generating Matrix Data}
 
 Matrix data is generated on a per-process basis, through typical random number generation techniques. Each process generates its own, equally sized, submatrix. The size of the submatrices is determined by the desired size of the overall matrix which is being transposed. If the number of available processes is so large that an even distribution would yield submatrices smaller than $2 \times 2$, then some processes are left out of the transposition entirely, in order to impose the $2 \times 2$ minimum submatrix size. Similarly, processes are sometimes excluded to ensure that each process only ever performs a transposition on a single square submatrix.
 
-%The reading operations used within this implementation are MPI's collective I/O functions, specifically the \textit{MPI File read all} function. Each process defines its own file view based on a common \textit{filetype}, as described below, and different offset value. In doing so, each process is able to appropriately read the data for its associated submatrix despite reads being done collectively. 
+%The reading operations used within this implementation are MPI's collective I/O functions, specifically the \textit{MPI File read all} function. Each process defines its own file view based on a common \textit{filetype}, as described below, and different offset value. In doing so, each process is able to appropriately read the data for its associated submatrix, despite reads being done collectively. 
 
 
 \subsection{Performing Submatrix Transpositions}
@@ -177,7 +177,7 @@ Within this two-sided communication approach, all participating processes will s
 
 \subsection{Writing of Transposed Matrix to File}
 
-The master node is responsible for writing the transposed matrix to an output file. This is implemented using the \textit{File-writ}e and \textit{File-write-at} functions. The master node performs the necessary calculations for transforming its continuous buffer representation of the matrix to the final row-major ordered contents of the output file. This involves calculating write offsets for each submatrix and writing these submatrices at the locations specified by said offsets. Each row of each submatrix is written consecutively; applying an offset equivalent to the size of the original matrix ($N$), after writing each row.
+The master node is responsible for writing the transposed matrix to an output file. This is implemented using the \textit{File-write} and \textit{File-write-at} functions. The master node performs the necessary calculations for transforming its continuous buffer representation of the matrix to the final row-major ordered contents of the output file. This involves calculating write offsets for each submatrix and writing these submatrices at the locations specified by said offsets. Each row of each submatrix is written consecutively; applying an offset equivalent to the size of the original matrix ($N$), after writing each row.
 
 
 
@@ -190,10 +190,10 @@ Like the two-sided approach, submatrices are generated on a per-process basis. A
 
 
 \subsection{Performing Submatrix Transpositions}
-For fairness, the one-sided approach does not attempt to improve on the parallelised naive approach used in the two-sided implementation.
+For accurate performance comparison, the one-sided approach does not attempt to improve on the parallelised naive approach used in the two-sided implementation.
 
 \subsection{Data Transmission}
-This implementation makes use of MPI's one-sided communications for data transmission. All participating processes open a \textit{Window}; placing their local submatrix buffers within their respective \textit{Windows}. The master node then performs \textit{Get} operations on the contents of all these windows, such that it acquires all of the transposed submatrices required to construct the overall transposed matrix. The submatrices obtained through the \textit{Get} operations are stored within a single contiguous buffer on the master node.
+This implementation makes use of MPI's one-sided communications for data transmission. All participating processes open a \textit{Window}; placing their local submatrix buffers within their respective \textit{Windows}. The master node then performs \textit{Get} operations on the contents of all of these windows, such that it acquires all of the transposed submatrices required to construct the overall transposed matrix. The submatrices obtained through the \textit{Get} operations are stored within a single contiguous buffer on the master node.
 
 
 \subsection{Writing of Transposed Matrix to File}
@@ -214,7 +214,7 @@ Like before, the master node is responsible for writing the contents of a contig
 % \subsection{Reading Input Data}
 % The reading of input data is implemented in manner which is almost identical to the MPI approach. All of UPC's I/O read/write functions are collective; thus an accurate comparison can be made between the UPC implementation and the MPI implementation.
 
-% Achieving non-contiguous file reading in BUPC, using its LIST I/O functions, is far more complex than the use of file views and offets. Indeed, the process is more manual in nature, to the extent that no real simplification is offered. Thus, within this implementation \textit{strided} reading and writing of files is implemented manually using typical BUPC collective I/O functions as opposed to the LIST I/O functionality present.
+% Achieving non-contiguous file reading in BUPC, using its LIST I/O functions, is far more complex than the use of file views and offsets. Indeed, the process is more manual in nature, to the extent that no real simplification is offered. Thus, within this implementation \textit{strided} reading and writing of files is implemented manually using typical BUPC collective I/O functions as opposed to the LIST I/O functionality present.
 
 % \subsection{Submatrix Transpositions}
 % The transposition of submatrices in the UPC implementation is implemented in exactly the same way as the submatrix transposition of the MPI implementation, i.e. a naive approach. This is done so as to ensure no bias in performance comparisons.
@@ -249,7 +249,7 @@ Submatrix transposition remains unchanged from the parallelised naive approach d
 
 \subsection{Data Transmission}
 
-Since the goal of these alternatives is the use of collective I/O, neither of the two alternatives require the sending of data to a master node for I/O purposes. Thus, processes need only swap their transposed submatrices, with those of corresponding processes. The mapping of these swaps is described by the diagram shown below: there is essentially a block-level transposition which occurs in this process.
+Since the goal of these alternatives is the use of collective I/O, neither of the two alternatives require the sending of data to a master node for I/O purposes. Thus, processes need only swap their transposed submatrices with those of corresponding processes. The mapping of these swaps is described by the diagram shown below: there is essentially a block-level transposition which occurs in this process.
 
 
 \begin{figure}[H]
@@ -259,16 +259,16 @@ Since the goal of these alternatives is the use of collective I/O, neither of th
     \label{fig:my_label}
 \end{figure}
 
-Of course, one of the alternatives does this through typical MPI \textit{Send} and \textit{Recv} commands whilst the other makes use of \textit{Windows} and \textit{Get} operations.
+Of course, one of the alternatives does this through typical MPI \textit{Send} and \textit{Recv} commands, whilst the other makes use of \textit{Windows} and \textit{Get} operations.
 
 
-% That said, this is no different to the two approache
+% That said, this is no different to the two approaches.
 
 \subsection{Writing Output Data}
 
 This step is very similar to the initial input data reading step. Once a process has obtained its corresponding block data, it is able to write this block to the output file. This is done through the use of a derived data type (\textit{Vector}) used to create a \textit{file view} such that each process can write its entire submatrix to a file within a single collective \textit{Write all} call.% Again, MPI's collective I/O is used in the form of the \texit{MPI File write all} function.
 
-It should be noted that the offsets and filetype used to define file views used when writing to the output file are the same as those used when reading data from the input file, for any given process. The following two diagrams contrast the nature of the collective I/O approaches and the two approaches discussed earlier.
+It should be noted that the offsets and file type used to define file views used when writing to the output file are the same as those used when reading data from the input file, for any given process. The following two diagrams contrast the nature of the collective I/O approaches and the two approaches discussed earlier.
 
 \begin{figure}[H]
     \centering
@@ -300,11 +300,11 @@ Since both of these approaches rely, inflexibly, on evenly distributing blocks a
 
 The implementations were sequentially tested on a cluster with NFS support. The number of processes used included 16, 32, and 64. Input matrices ranged in size from $8\times 8$ to $128\times 128$. Combinations of process count and matrix size were constrained to comply with the minimum $2\times 2$ block size for the two collective I/O alternatives discussed earlier. In addition, work divisions which do not yield square submatrices were not used for these two approaches.
 
-%The two reference implementations do not require such restrictions as
+%The two reference implementations do not require such restrictions.
 
 \section{Results and Discussion}
 
-This section contains the results of benchmarking the performance of the implemented approaches. This includes comparisons relating to the number of processes used for a single implementation, as well as inter-implementation comparisons. In addition, results are shown for some tests in which OpenMP compiler flags were not included i.e. tests in which intra-process transpositions ran serially.
+This section contains the results of benchmarking the performance of the implemented approaches. This includes comparisons relating to the number of processes used for a single implementation, as well as inter-implementation comparisons. In addition, results are shown for some tests in which OpenMP compiler flags were not included, i.e. tests in which intra-process transpositions ran serially.
 
 It is clear from figures \ref{fig:2s} and \ref{fig:1s} that there is a lack of scaling of performance with respect to process count. This is thought to be as a result of the somewhat small input matrix sizes used. That is, the communication overhead incurred as a result of the higher process count is not outweighed by the extra computing power available, due to the limited complexity of the work done by each process. 
 
@@ -697,7 +697,7 @@ A job queue strategy would do little to assist with the issue of maintaining a m
 
 \subsection{Inefficient Implementations of Submatrix Transpositions}
 
-As discussed earlier, the algorithm used to transpose the submatrices is a parallelised naive approach. Given the size of the input matrices tested, this approach achieves sufficient performance. Moreover, a more complex approach would likely involve increased overhead, outweighing the performance benefits for small submatrices. That said, for scalability, the submatrix transpositions could instead make use further block partitioning wherein the block transpositions and swaps are parallelised.
+As discussed earlier, the algorithm used to transpose the submatrices is a parallelised naive approach. Given the size of the input matrices tested, this approach achieves sufficient performance. Moreover, a more complex approach would likely involve increased overhead, outweighing the performance benefits for small submatrices. That said, for scalability, the submatrix transpositions could instead make use of further block partitioning wherein the block transpositions and swaps are parallelised.
 
 
 \subsection{Scalability for Extremely Large Matrices}
@@ -715,7 +715,7 @@ That said, it would be hard to achieve a fair comparison between the collective 
 
 
 \section{Conclusion}
-Two matrix transposition implementations have been presented. These implementations make use of a block-based approach using MPI, incorporating either one-sided or two-sided communications. The two-sided implementation was found to achieve superior performance in the tests conducted. Additionally, a collective I/O approach was found to be a viable alternative to the two presented implementations, especially if reading matrix data from a file is required. The two main implementations which have been presented in this report could be improved in terms of the redundancy they achieve and, in addition, the efficiency and scalability of the submatrix transposition algorithms they incorporate.
+Two matrix transposition implementations have been presented. These implementations make use of a block-based approach using MPI, incorporating either one-sided or two-sided communications. The two-sided implementation was found to achieve superior performance in the tests conducted. Additionally, a collective I/O approach was found to be a viable alternative to the two presented implementations, especially if reading of matrix data from a file is required. The two main implementations which have been presented in this report could be improved in terms of the redundancy they achieve and, in addition, the efficiency and scalability of the submatrix transposition algorithms they incorporate.
 
 
 \clearpage
